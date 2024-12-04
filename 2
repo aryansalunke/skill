@@ -1,0 +1,73 @@
+from flask import Flask, request, jsonify
+from datetime import datetime
+
+app = Flask(__name__)
+
+# In-memory storage for habits
+habits = []
+habit_id_counter = 1
+
+# Base route to handle "/"
+@app.route('/')
+def home():
+    return jsonify({
+        "message": "Welcome to the Habit Tracker API!",
+        "endpoints": {
+            "POST /habits": "Add a new habit",
+            "PUT /habits/<id>": "Update habit completion",
+            "GET /habits": "Get all habits",
+            "GET /habits/report": "Generate a weekly report"
+        }
+    }), 200
+
+# Add a habit
+@app.route('/habits', methods=['POST'])
+def add_habit():
+    global habit_id_counter
+    data = request.json
+    new_habit = {
+        "id": habit_id_counter,
+        "name": data["name"],
+        "goal": data["goal"],
+        "completion": []
+    }
+    habits.append(new_habit)
+    habit_id_counter += 1
+    return jsonify(new_habit), 201
+
+# Mark a habit as complete for a day
+@app.route('/habits/<int:habit_id>', methods=['PUT'])
+def update_habit(habit_id):
+    data = request.json
+    for habit in habits:
+        if habit["id"] == habit_id:
+            habit["completion"].append({
+                "date": data["date"],
+                "completed": data["completed"]
+            })
+            return jsonify(habit), 200
+    return jsonify({"error": "Habit not found"}), 404
+
+# Get all habits
+@app.route('/habits', methods=['GET'])
+def get_habits():
+    return jsonify(habits), 200
+
+# Generate a weekly report
+@app.route('/habits/report', methods=['GET'])
+def weekly_report():
+    report = []
+    for habit in habits:
+        completed_days = sum(1 for c in habit["completion"] if c["completed"])
+        total_days = len(habit["completion"])
+        completion_rate = (completed_days / total_days) * 100 if total_days > 0 else 0
+        report.append({
+            "name": habit["name"],
+            "completion_rate": round(completion_rate),
+            "completed_days": completed_days,
+            "total_days": total_days
+        })
+    return jsonify(report), 200
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
